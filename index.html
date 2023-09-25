@@ -84,17 +84,6 @@
       <p>Contact us via <a href="mailto:info@bethanyspieshop.com">email</a></p>
     </footer>
   </div>
-  <script src="scripts/geoController.js"></script>
-  <script>
-    'use strict';
-
-    function drawMap() {
-      geoController.getCurrentLocation(function (pos) {
-        console.table(pos);
-        window.location.href = `https://google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-      })
-    }
-  </script>
 </body>
 
 </html>
