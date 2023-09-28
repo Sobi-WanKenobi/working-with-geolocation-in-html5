@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Directions to Bethany's Pie Shop!</title>
+  <link rel="stylesheet" type="text/css" href="styles/site.css">
+  <script type="text/javascript" src="settings.js"></script>
+</head>
+
+<body>
+  <header id="mainheader">
+    <nav>
+      <ul>
+        <li><img src="images/cake.svg" height="55" /></li>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="#">All pies</a></li>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Map</a></li>
+      </ul>
+    </nav>
+  </header>
+  <div class="container">
+    <aside id="leftmenu">
+      <a href="index.html"><img src="images/bethanylogo.png" /></a>
+
+      <header>
+        <h4 style="text-align: center;">Browse our pies</h4>
+      </header>
+      <ul>
+        <li><a href="#">All pies</a></li>
+        <li><a href="#">Cheese cakes</a></li>
+        <li><a href="#">Fruit pies</a></li>
+        <li><a href="#">Seasonal pies</a></li>
+        <li><a href="#promos">Promotions</a></li>
+        <li><a href="#">Map</a></li>
+      </ul>
+
+      <input type="search" class="searchbox" placeholder="Search our store" />
+    </aside>
+    <main id="main">
+      <div id="map" class="map"></div>
+      <br/>
+      <label>Address: 
+        <input id="address" type="text" value="1 Cadillac Drive, Brentwood TN 37027">
+        <button onclick="gmapController.getDirections()">Directions from Address</button>
+      </label>
+      <button onclick="gmapController.setMarkerOnAddress()">Find Address</button>
+      <br/>
+      <div id="directionsArea"></div>
+    </main>
+
+    <footer>
+      <p>Our address is <address>Bethany's Pie Shop - 117 Franklin Rd, Brentwood, TN 37027</address>
+      </p>
+      <p><small>&copy; 2020 Bethany's Pie Shop - All rights reserved</small></p>
+      <p>Contact us via <a href="mailto:info@bethanyspieshop.com">email</a></p>
+    </footer>
+  </div>
+  <script>
+    var gmapController = (function () {
+      let map = null;
+      let infoWindow = null;
+      let addrMarker = null;
+      let deliveryArea = null;
+
+      let bethanyMap = {
+        "lat": 36.036020,
+        "lng": -86.787600,
+        "marker": null,
+        "title": "Bethany's Pie Shop",
+        "infoContent": "<div class='info-window'><address>Bethany's Pie Shop<br/>117 Franklin Rd<br/>Brentwood, TN 37027</address></div>",
+        "infoIcon": "images/cherrypie.jpg"
+      };
+
+      let userMap = {
+        "lat": 36.0364274,
+        "lng": -86.7968576,
+        "title": "Your Location",
+        "infoContent": "<div class='info-window'><p>This is your location</p></div>",
+        "infoIcon": "images/walking.jpg"
+      };
+
+      let deliveryMeters = {
+        "north": 400,
+        "south": 1600,
+        "east": 1600,
+        "west": 1600
+      }
+
+      function initialize() {
+        let bounds = new google.maps.LatLngBounds();
+        infoWindow = new google.maps.InfoWindow();
+        drawMap(bethanyMap);
+        
+        bethanyMap.marker = drawMarker(bethanyMap);
+        addInfoWindow(bethanyMap);
+        bounds.extend(bethanyMap.marker.position);
+        
+        userMap.marker = drawMarker(userMap);
+        addInfoWindow(userMap);
+        bounds.extend(userMap.marker.position);
+        
+        map.fitBounds(bounds);
+
+        drawFence(bethanyMap);
+        
+        getDirections(new google.maps.LatLng(userMap.lat, userMap.lng), new google.maps.LatLng(bethanyMap.lat, bethanyMap.lng));
+      }
+
+      function drawMap(mapObject) {
+        let pos = new google.maps.LatLng(mapObject.lat, mapObject.lng);
+        let mapOptions = {
+          center: pos,
+          zoom: 16,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+
+        map = new google.maps.Map(document.getElementById("map"), mapOptions);
+      }
+
+      function drawMarker(mapObject) {
+        let marker = new google.maps.Marker({
+          position: new google.maps.LatLng(mapObject.lat, mapObject.lng),
+          map: map,
+          title: mapObject.title,
+          icon: mapObject.infoIcon
+        });
+
+        marker.setMap(map);
+
+        return marker;
+      }
+
+      function addInfoWindow(mapObject) {
+        google.maps.event.addListener(mapObject.marker, 'click', function() {
+          infoWindow.setContent(mapObject.infoContent);
+          infoWindow.open(map, mapObject.marker);
+        })
+      }
+
+      function getDirections(from, to) {
+        let directionsService = new google.maps.DirectionsService();
+        let directionsRenderer = new google.maps.DirectionsRenderer();
+
+        directionsService.route(
+          {
+            origin: from,
+            destination: to,
+            travelMode: 'DRIVING',
+            avoidHighways: true, 
+            provideRouteAlternatives: true
+          },
+          function (response, status) {
+            if(status === 'OK') {
+              directionsRenderer.setDirections(response);
+
+              directionsRenderer.setMap(map);
+
+              directionsRenderer.setPanel(document.getElementById("directionsArea"));
+            } else {
+              displayError('Directions request failed due to ' + status);
+            }
+          }
+        );
+      }
+
+      function drawFence(mapObject) {
+        let bounds = makeDeliveryFence(new google.maps.LatLng(mapObject.lat, mapObject.lng), deliveryMeters);
+
+        deliveryArea = new google.maps.Rectangle({
+          map: map,
+          bounds: bounds,
+          strokeColor: 'red',
+          strokeWidth: 2,
+          fillOpacity: 0
+        });
+
+        map.fitBounds(bounds);
+      }
+
+      function makeDeliveryFence(point, fence) {
+        let computeOffset = google.maps.geometry.spherical.computeOffset; //shortening name
+
+        var n = computeOffset(point, fence.north, 0);
+        var ne = computeOffset(n, fence.east, 90);
+        var s = computeOffset(point, fence.south, 180);
+        var sw = computeOffset(s, fence.west, -90);
+
+        return new google.maps.LatLngBounds(sw, ne);
+      }
+
+      function setMarkerOnAddress(address) {
+        var geoCoder = new google.maps.Geocoder();
+
+        if(address.length > 0){
+          geoCoder.geocode({'address': address}, function(results, status) {
+            switch (status) {
+              case google.maps.GeocoderStatus.OK:
+                if(results[0]) {
+                  let mapObject = {
+                    "lat": results[0].geometry.location.lat(),
+                    "lng": results[0].geometry.location.lng(),
+                    "marker": null,
+                    "title": address,
+                    "infoContent": null,
+                    "infoIcon": null
+                  }
+
+                  if(addrMarker) {
+                    addrMarker.setMap(null);
+                  }
+
+                  addrMarker = drawMarker(mapObject);
+
+                  let bounds = map.getBounds();
+                  bounds.extend(addrMarker.position);
+                  map.fitBounds(bounds);
+
+                  if(!deliveryArea.getBounds().contains(addrMarker.position)) {
+                    displayError("Address is NOT in the delivery area");
+                  }
+
+                } else {
+                  displayError("Could not locate address.")
+                }
+                break;
+              case google.maps.GeocoderStatus.ZERO_RESULTS:
+                displayError("No such address found");
+                break;
+              case google.maps.GeocoderStatus.OVER_QUERY_LIMIT:
+                displayError("Query limit has been exceeded.")
+                break;
+                case google.maps.GeocoderStatus.REQUEST_DENIED:
+                  displayError("Query request was denied.");
+                  break;
+                case google.maps.GeocoderStatus.INVALID_REQUEST:
+                  displayError("Query request was invalid.");
+                  break;
+                default:
+                  displayError("Unknown status: " + status);
+                  break;
+            }
+          });
+        } else {
+          displayError("Please enter an address.");
+        }
+      }
+
+      function displayError(msg) {
+        alert(msg);
+      }
+
+      return {
+        "initialize": initialize,
+        "getDirections": function() {
+          getDirections(document.getElementById("address").value,
+          "117 Franklin Rd, Brentwood TN 37027")
+        },
+        "setMarkerOnAddress": function() {
+          setMarkerOnAddress(document.getElementById("address").value)
+        }
+      }
+    })();
+  </script>
+  <script>
+    document.write("\<script src='https://maps.googleapis.com/maps/api/js?key=" + GoogleMapsKey + "&libraries=geometry&callback=gmapController.initialize'\>\</script\>");        
+  </script>
+</body>
+
+</html>
